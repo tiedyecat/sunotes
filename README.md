@@ -5,14 +5,21 @@ This script generates a summary report for Facebook Ads accounts and sends it to
 ## Setup
 
 1. **Python Installation**: Python 3.11+ is already installed on your system
-2. **Dependencies**: The `requests` library is already available
+2. **Dependencies**: Install required packages:
+   ```bash
+   pip3 install -r requirements.txt
+   ```
 
 ## Configuration
 
-Before running the script, you need to update the following in `facebook_ads_report.py`:
+1. **Environment Variables**: Copy the `.env` file and update it with your credentials:
+   - Replace `your_facebook_access_token_here` with your actual Facebook Graph API access token
+   - The Google Chat webhook URL is pre-configured, but you can update it if needed
 
-1. **Facebook Access Token**: Replace `"REPLACE_WITH_YOUR_ACCESS_TOKEN"` with your actual Facebook Graph API access token
-2. **Google Chat Webhook**: The webhook URL is already configured, but you can update it if needed
+2. **Alternative Configuration**: You can also set environment variables directly:
+   ```bash
+   export ACCESS_TOKEN="your_facebook_access_token_here"
+   ```
 
 ## Usage
 
@@ -39,6 +46,8 @@ python3 facebook_ads_report.py
 
 4. **Sends to Google Chat**: Posts the report to the configured Google Chat webhook
 
-## Note
+## Security
 
-Make sure your Facebook access token has the necessary permissions to read insights and ad set data from the accounts listed in the script.
+- The `.env` file contains sensitive information and is excluded from git tracking
+- Never commit your actual access tokens to version control
+- Make sure your Facebook access token has the necessary permissions to read insights and ad set data from the accounts listed in the script

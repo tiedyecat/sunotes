@@ -1,7 +1,12 @@
 import requests
 import datetime
+import os
+from dotenv import load_dotenv
 
-ACCESS_TOKEN = "REPLACE_WITH_YOUR_ACCESS_TOKEN"
+# Load environment variables from .env file
+load_dotenv()
+
+ACCESS_TOKEN = os.getenv("ACCESS_TOKEN")
 API_VERSION = "v19.0"
 WEBHOOK = "https://chat.googleapis.com/v1/spaces/AAQARW0Ay7s/messages?key=AIzaSyDdI0hCZtE6vySjMm-WEfRq3CPzqKqqsHI&token=9Y7d0p62A5I6phFsmp1WjkCxi-aeYoqqi093MfOAmHY"
 
