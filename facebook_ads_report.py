@@ -113,6 +113,7 @@ days_left = (eom - today).days + 1
 total_days = eom.day
 
 rows = []
+totals = {"spend": 0, "leads": 0, "purchases": 0}
 
 for acc in accounts:
     acc_id = acc["account_id"]
@@ -156,8 +157,22 @@ for acc in accounts:
     cpp = round(spend / purchases, 2) if purchases else ""
     cost_per_conv = round(spend / (leads + purchases), 2) if (leads + purchases) else ""
 
+    # Format monetary values with dollar signs
+    daily_budget_formatted = f"${daily_budget:,.2f}" if daily_budget > 0 else "-"
+    spend_formatted = f"${spend:,.2f}" if spend > 0 else "-"
+    spend_remaining_formatted = f"${spend_remaining:,.2f}" if spend_remaining > 0 else "-"
+    cpl_formatted = f"${cpl:,.2f}" if cpl else "-"
+    cpp_formatted = f"${cpp:,.2f}" if cpp else "-"
+    cost_per_conv_formatted = f"${cost_per_conv:,.2f}" if cost_per_conv else "-"
+
+    # Add to totals
+    totals["spend"] += spend
+    totals["leads"] += leads
+    totals["purchases"] += purchases
+
     rows.append([
-        name, daily_budget, spend, spend_remaining, leads, purchases, cpl, cpp, cost_per_conv
+        name, daily_budget_formatted, spend_formatted, spend_remaining_formatted, 
+        leads, purchases, cpl_formatted, cpp_formatted, cost_per_conv_formatted
     ])
 
 # Build markdown table
@@ -167,8 +182,18 @@ table_md += "| " + " | ".join(["---"] * len(header)) + " |\n"
 for row in rows:
     table_md += "| " + " | ".join(str(x) for x in row) + " |\n"
 
+# Create summary section
+summary = f"""
+**📊 Summary for {datetime.date.today().strftime('%B %Y')}**
+• Total Spend: ${totals["spend"]:,.2f}
+• Total Leads: {totals["leads"]:,}
+• Total Purchases: {totals["purchases"]:,}
+• Days Remaining: {days_left}
+• Accounts Processed: {len(accounts)}
+"""
+
 message = {
-    "text": f"*Paid Media Account Summary*\n\n{table_md}"
+    "text": f"*🎯 Paid Media Account Summary*\n{summary}\n\n{table_md}"
 }
 
 if not DRY_RUN:
