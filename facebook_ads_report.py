@@ -1,6 +1,7 @@
 import requests
 import datetime
 import os
+import sys
 from dotenv import load_dotenv
 
 # Load environment variables from .env file
@@ -9,6 +10,31 @@ load_dotenv()
 ACCESS_TOKEN = os.getenv("ACCESS_TOKEN")
 API_VERSION = "v19.0"
 WEBHOOK = "https://chat.googleapis.com/v1/spaces/AAQARW0Ay7s/messages?key=AIzaSyDdI0hCZtE6vySjMm-WEfRq3CPzqKqqsHI&token=9Y7d0p62A5I6phFsmp1WjkCxi-aeYoqqi093MfOAmHY"
+
+# Check for dry run mode (default to True for safety)
+DRY_RUN = os.getenv("DRY_RUN", "true").lower() in ("true", "1", "yes")
+
+# Override with command line argument
+if len(sys.argv) > 1:
+    if sys.argv[1] == "--send":
+        DRY_RUN = False
+    elif sys.argv[1] == "--dry-run":
+        DRY_RUN = True
+    elif sys.argv[1] == "--help":
+        print("Usage: python3 facebook_ads_report.py [--send|--dry-run|--help]")
+        print("  --send     Send report to Google Chat")
+        print("  --dry-run  Print report to console only (default)")
+        print("  --help     Show this help message")
+        sys.exit(0)
+
+# Check if access token is configured
+if not ACCESS_TOKEN or ACCESS_TOKEN == "your_facebook_access_token_here":
+    print("ERROR: ACCESS_TOKEN not configured in .env file")
+    print("Please edit the .env file and set your Facebook access token")
+    sys.exit(1)
+
+print(f"Running in {'LIVE' if not DRY_RUN else 'DRY RUN'} mode")
+print(f"Processing {len(accounts)} accounts...")
 
 accounts = [
     {"account_name": "American Barbell Clubs", "account_id": "768011641837919"},
@@ -144,6 +170,21 @@ message = {
     "text": f"*Paid Media Account Summary*\n\n{table_md}"
 }
 
-resp = requests.post(WEBHOOK, json=message)
-print("Google Chat webhook status:", resp.status_code)
-print(resp.text) 
+if not DRY_RUN:
+    print("Sending report to Google Chat...")
+    resp = requests.post(WEBHOOK, json=message)
+    print("Google Chat webhook status:", resp.status_code)
+    if resp.status_code == 200:
+        print("✅ Report sent successfully!")
+    else:
+        print(f"❌ Error sending report: {resp.text}")
+else:
+    print("\n" + "="*80)
+    print("🧪 DRY RUN MODE - Report NOT sent to Google Chat")
+    print("="*80)
+    print("\nGenerated report:")
+    print(message["text"])
+    print("\n" + "="*80)
+    print("To send this report to Google Chat, run:")
+    print("python3 facebook_ads_report.py --send")
+    print("="*80) 

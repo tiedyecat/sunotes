@@ -15,17 +15,33 @@ This script generates a summary report for Facebook Ads accounts and sends it to
 1. **Environment Variables**: Copy the `.env` file and update it with your credentials:
    - Replace `your_facebook_access_token_here` with your actual Facebook Graph API access token
    - The Google Chat webhook URL is pre-configured, but you can update it if needed
+   - `DRY_RUN=true` means the script will only print to console (safe for testing)
 
 2. **Alternative Configuration**: You can also set environment variables directly:
    ```bash
    export ACCESS_TOKEN="your_facebook_access_token_here"
+   export DRY_RUN="false"
    ```
 
 ## Usage
 
-Run the script with:
+### Test Mode (Default - Recommended)
 ```bash
 python3 facebook_ads_report.py
+# or explicitly
+python3 facebook_ads_report.py --dry-run
+```
+This will generate and display the report in your console without sending it to Google Chat.
+
+### Send to Google Chat
+```bash
+python3 facebook_ads_report.py --send
+```
+This will generate the report and send it to the configured Google Chat webhook.
+
+### Help
+```bash
+python3 facebook_ads_report.py --help
 ```
 
 ## What the Script Does
@@ -44,10 +60,13 @@ python3 facebook_ads_report.py
 
 3. **Generates Report**: Creates a markdown table with all the metrics
 
-4. **Sends to Google Chat**: Posts the report to the configured Google Chat webhook
+4. **Output Options**:
+   - **Dry Run Mode**: Prints the report to console for review
+   - **Send Mode**: Posts the report to the configured Google Chat webhook
 
 ## Security
 
 - The `.env` file contains sensitive information and is excluded from git tracking
 - Never commit your actual access tokens to version control
 - Make sure your Facebook access token has the necessary permissions to read insights and ad set data from the accounts listed in the script
+- Always test with dry run mode first before sending to chat
