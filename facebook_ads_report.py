@@ -34,7 +34,6 @@ if not ACCESS_TOKEN or ACCESS_TOKEN == "your_facebook_access_token_here":
     sys.exit(1)
 
 print(f"Running in {'LIVE' if not DRY_RUN else 'DRY RUN'} mode")
-print(f"Processing {len(accounts)} accounts...")
 
 accounts = [
     {"account_name": "American Barbell Clubs", "account_id": "768011641837919"},
@@ -102,6 +101,8 @@ accounts = [
     {"account_name": "West Seattle Health Club", "account_id": "3658212624277624"},
     {"account_name": "World Gym Beaumont", "account_id": "180438538439013"},
 ]
+
+print(f"Processing {len(accounts)} accounts...")
 
 today = datetime.date.today()
 if today.month < 12:
