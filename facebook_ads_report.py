@@ -110,10 +110,17 @@ if today.month < 12:
 else:
     eom = datetime.date(today.year, 12, 31)
 days_left = (eom - today).days + 1
-total_days = eom.day
+
+# Calculate total days in current month
+current_date = datetime.date.today()
+if current_date.month == 12:
+    next_month = datetime.date(current_date.year + 1, 1, 1)
+else:
+    next_month = datetime.date(current_date.year, current_date.month + 1, 1)
+total_days_in_month = (next_month - datetime.date(current_date.year, current_date.month, 1)).days
 
 rows = []
-totals = {"spend": 0, "leads": 0, "purchases": 0}
+totals = {"spend": 0, "leads": 0, "purchases": 0, "monthly_budget": 0}
 skipped_accounts = []
 
 # Group for CLUB4 accounts
@@ -192,10 +199,20 @@ for acc in accounts:
         if insights_error and adset_error:
             continue
 
+    # Calculate metrics
+    monthly_budget = daily_budget * total_days_in_month
+    spend_remaining = monthly_budget - spend
+    spend_remaining_pct = (spend_remaining / monthly_budget * 100) if monthly_budget > 0 else 0
+    
+    cpl = round(spend / leads, 2) if leads else 0
+    cpp = round(spend / purchases, 2) if purchases else 0
+    cost_per_conv = round(spend / (leads + purchases), 2) if (leads + purchases) else 0
+
     # Add to totals
     totals["spend"] += spend
     totals["leads"] += leads
     totals["purchases"] += purchases
+    totals["monthly_budget"] += monthly_budget
 
     # Handle CLUB4 accounts - group them together
     if is_club4:
@@ -208,57 +225,62 @@ for acc in accounts:
             club4_data["errors"].append(f"{name}: {reason}")
     else:
         # Individual account (not CLUB4)
-        spend_remaining = round(daily_budget * days_left, 2)
-        cpl = round(spend / leads, 2) if leads else ""
-        cpp = round(spend / purchases, 2) if purchases else ""
-        cost_per_conv = round(spend / (leads + purchases), 2) if (leads + purchases) else ""
-
-        # Format monetary values with dollar signs
-        daily_budget_formatted = f"${daily_budget:,.2f}" if daily_budget > 0 else "-"
-        spend_formatted = f"${spend:,.2f}" if spend > 0 else "-"
-        spend_remaining_formatted = f"${spend_remaining:,.2f}" if spend_remaining > 0 else "-"
-        cpl_formatted = f"${cpl:,.2f}" if cpl else "-"
-        cpp_formatted = f"${cpp:,.2f}" if cpp else "-"
-        cost_per_conv_formatted = f"${cost_per_conv:,.2f}" if cost_per_conv else "-"
-
-        rows.append([
-            name, daily_budget_formatted, spend_formatted, spend_remaining_formatted, 
-            leads, purchases, cpl_formatted, cpp_formatted, cost_per_conv_formatted
-        ])
+        account_data = {
+            "name": name,
+            "daily_budget": daily_budget,
+            "monthly_budget": monthly_budget,
+            "spend": spend,
+            "spend_remaining": spend_remaining,
+            "spend_remaining_pct": spend_remaining_pct,
+            "leads": leads,
+            "purchases": purchases,
+            "cpl": cpl,
+            "cpp": cpp,
+            "cost_per_conv": cost_per_conv
+        }
+        rows.append(account_data)
 
 # Add consolidated CLUB4 entry
 if club4_data["account_count"] > 0:
-    club4_spend_remaining = round(club4_data["daily_budget"] * days_left, 2)
-    club4_cpl = round(club4_data["spend"] / club4_data["leads"], 2) if club4_data["leads"] else ""
-    club4_cpp = round(club4_data["spend"] / club4_data["purchases"], 2) if club4_data["purchases"] else ""
-    club4_cost_per_conv = round(club4_data["spend"] / (club4_data["leads"] + club4_data["purchases"]), 2) if (club4_data["leads"] + club4_data["purchases"]) else ""
+    club4_monthly_budget = club4_data["daily_budget"] * total_days_in_month
+    club4_spend_remaining = club4_monthly_budget - club4_data["spend"]
+    club4_spend_remaining_pct = (club4_spend_remaining / club4_monthly_budget * 100) if club4_monthly_budget > 0 else 0
+    
+    club4_cpl = round(club4_data["spend"] / club4_data["leads"], 2) if club4_data["leads"] else 0
+    club4_cpp = round(club4_data["spend"] / club4_data["purchases"], 2) if club4_data["purchases"] else 0
+    club4_cost_per_conv = round(club4_data["spend"] / (club4_data["leads"] + club4_data["purchases"]), 2) if (club4_data["leads"] + club4_data["purchases"]) else 0
 
-    # Format CLUB4 values
-    club4_daily_budget_formatted = f"${club4_data['daily_budget']:,.2f}" if club4_data["daily_budget"] > 0 else "-"
-    club4_spend_formatted = f"${club4_data['spend']:,.2f}" if club4_data["spend"] > 0 else "-"
-    club4_spend_remaining_formatted = f"${club4_spend_remaining:,.2f}" if club4_spend_remaining > 0 else "-"
-    club4_cpl_formatted = f"${club4_cpl:,.2f}" if club4_cpl else "-"
-    club4_cpp_formatted = f"${club4_cpp:,.2f}" if club4_cpp else "-"
-    club4_cost_per_conv_formatted = f"${club4_cost_per_conv:,.2f}" if club4_cost_per_conv else "-"
+    club4_account_data = {
+        "name": f"CLUB4 (All {club4_data['account_count']} Locations)",
+        "daily_budget": club4_data["daily_budget"],
+        "monthly_budget": club4_monthly_budget,
+        "spend": club4_data["spend"],
+        "spend_remaining": club4_spend_remaining,
+        "spend_remaining_pct": club4_spend_remaining_pct,
+        "leads": club4_data["leads"],
+        "purchases": club4_data["purchases"],
+        "cpl": club4_cpl,
+        "cpp": club4_cpp,
+        "cost_per_conv": club4_cost_per_conv
+    }
+    rows.insert(0, club4_account_data)
 
-    rows.insert(0, [
-        f"CLUB4 (All {club4_data['account_count']} Locations)", 
-        club4_daily_budget_formatted, 
-        club4_spend_formatted, 
-        club4_spend_remaining_formatted, 
-        club4_data["leads"], 
-        club4_data["purchases"], 
-        club4_cpl_formatted, 
-        club4_cpp_formatted, 
-        club4_cost_per_conv_formatted
-    ])
+# Build formatted report
+report_content = ""
+for account in rows:
+    report_content += f"""
+**{account['name']}**
+• Daily Budget: ${account['daily_budget']:,.2f}
+• Total Monthly Budget: ${account['monthly_budget']:,.2f}
+• Spend MTD: ${account['spend']:,.2f}
+• Spend Remaining: ${account['spend_remaining']:,.2f} ({account['spend_remaining_pct']:.1f}%)
+• Leads: {account['leads']:,}
+• Purchases: {account['purchases']:,}
+• CPL: ${account['cpl']:,.2f}
+• CPP: ${account['cpp']:,.2f}
+• Cost/Conv: ${account['cost_per_conv']:,.2f}
 
-# Build markdown table
-header = ["Account Name", "Daily Budget", "Spend", "Spend Remaining", "Leads", "Purchases", "CPL", "CPP", "Cost/Conv"]
-table_md = "| " + " | ".join(header) + " |\n"
-table_md += "| " + " | ".join(["---"] * len(header)) + " |\n"
-for row in rows:
-    table_md += "| " + " | ".join(str(x) for x in row) + " |\n"
+"""
 
 # Create summary section
 current_date = datetime.date.today()
@@ -268,22 +290,24 @@ summary = f"""
 *Data from {month_start.strftime('%B %d')} - {current_date.strftime('%B %d, %Y')}*
 
 • Total Spend: ${totals["spend"]:,.2f}
+• Total Monthly Budget: ${totals["monthly_budget"]:,.2f}
 • Total Leads: {totals["leads"]:,}
 • Total Purchases: {totals["purchases"]:,}
 • Days Remaining: {days_left}
 • Accounts Processed: {len(rows)}
 • Accounts Skipped: {len(skipped_accounts)}
+
 """
 
 # Add error summary if there are skipped accounts
 error_summary = ""
 if skipped_accounts:
-    error_summary = "\n**⚠️ Skipped Accounts:**\n"
+    error_summary = "**⚠️ Skipped Accounts:**\n"
     for skip in skipped_accounts:
         error_summary += f"• {skip['name']}: {skip['reason']}\n"
 
 message = {
-    "text": f"*🎯 Paid Media Account Summary*\n{summary}\n\n{table_md}{error_summary}"
+    "text": f"*🎯 Paid Media Account Summary*\n{summary}\n{report_content}{error_summary}"
 }
 
 if not DRY_RUN:
