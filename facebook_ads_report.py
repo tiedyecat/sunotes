@@ -114,10 +114,22 @@ total_days = eom.day
 
 rows = []
 totals = {"spend": 0, "leads": 0, "purchases": 0}
+skipped_accounts = []
+
+# Group for CLUB4 accounts
+club4_data = {
+    "spend": 0,
+    "leads": 0, 
+    "purchases": 0,
+    "daily_budget": 0,
+    "account_count": 0,
+    "errors": []
+}
 
 for acc in accounts:
     acc_id = acc["account_id"]
     name = acc["account_name"]
+    is_club4 = "club4" in name.lower()
 
     # Get MTD spend, leads, purchases
     insights_url = (
@@ -128,6 +140,8 @@ for acc in accounts:
     )
     resp = requests.get(insights_url)
     spend = leads = purchases = 0
+    insights_error = None
+    
     if resp.status_code == 200:
         data = resp.json().get("data", [{}])[0]
         spend = float(data.get("spend", 0))
@@ -135,7 +149,8 @@ for acc in accounts:
         leads = int(actions.get("lead", 0))
         purchases = int(actions.get("omni_purchase", 0) or actions.get("purchase", 0))
     else:
-        print(f"Insights error for {acc_id}: {resp.text}")
+        insights_error = resp.json().get("error", {}).get("message", "Unknown error")
+        print(f"Insights error for {name}: {insights_error}")
 
     # Get sum of ad set daily budgets
     adset_url = (
@@ -146,33 +161,96 @@ for acc in accounts:
     )
     adset_resp = requests.get(adset_url)
     daily_budget = 0
+    adset_error = None
+    
     if adset_resp.status_code == 200:
         adsets = adset_resp.json().get("data", [])
         daily_budget = sum(int(a["daily_budget"]) / 100 for a in adsets if a.get("daily_budget"))
     else:
-        print(f"Adset error for {acc_id}: {adset_resp.text}")
+        adset_error = adset_resp.json().get("error", {}).get("message", "Unknown error")
+        print(f"Adset error for {name}: {adset_error}")
 
-    spend_remaining = round(daily_budget * days_left, 2)
-    cpl = round(spend / leads, 2) if leads else ""
-    cpp = round(spend / purchases, 2) if purchases else ""
-    cost_per_conv = round(spend / (leads + purchases), 2) if (leads + purchases) else ""
-
-    # Format monetary values with dollar signs
-    daily_budget_formatted = f"${daily_budget:,.2f}" if daily_budget > 0 else "-"
-    spend_formatted = f"${spend:,.2f}" if spend > 0 else "-"
-    spend_remaining_formatted = f"${spend_remaining:,.2f}" if spend_remaining > 0 else "-"
-    cpl_formatted = f"${cpl:,.2f}" if cpl else "-"
-    cpp_formatted = f"${cpp:,.2f}" if cpp else "-"
-    cost_per_conv_formatted = f"${cost_per_conv:,.2f}" if cost_per_conv else "-"
+    # Track skipped accounts
+    if insights_error or adset_error:
+        error_reason = insights_error or adset_error
+        if "ads_management" in error_reason.lower() or "ads_read" in error_reason.lower():
+            reason = "No permission"
+        elif "malformed access token" in error_reason.lower():
+            reason = "Invalid token"
+        elif "account not found" in error_reason.lower():
+            reason = "Account not found"
+        else:
+            reason = "API error"
+            
+        skipped_accounts.append({
+            "name": name,
+            "reason": reason,
+            "error": error_reason[:100] + "..." if len(error_reason) > 100 else error_reason
+        })
+        
+        # Skip this account if we have no data
+        if insights_error and adset_error:
+            continue
 
     # Add to totals
     totals["spend"] += spend
     totals["leads"] += leads
     totals["purchases"] += purchases
 
-    rows.append([
-        name, daily_budget_formatted, spend_formatted, spend_remaining_formatted, 
-        leads, purchases, cpl_formatted, cpp_formatted, cost_per_conv_formatted
+    # Handle CLUB4 accounts - group them together
+    if is_club4:
+        club4_data["spend"] += spend
+        club4_data["leads"] += leads
+        club4_data["purchases"] += purchases
+        club4_data["daily_budget"] += daily_budget
+        club4_data["account_count"] += 1
+        if insights_error or adset_error:
+            club4_data["errors"].append(f"{name}: {reason}")
+    else:
+        # Individual account (not CLUB4)
+        spend_remaining = round(daily_budget * days_left, 2)
+        cpl = round(spend / leads, 2) if leads else ""
+        cpp = round(spend / purchases, 2) if purchases else ""
+        cost_per_conv = round(spend / (leads + purchases), 2) if (leads + purchases) else ""
+
+        # Format monetary values with dollar signs
+        daily_budget_formatted = f"${daily_budget:,.2f}" if daily_budget > 0 else "-"
+        spend_formatted = f"${spend:,.2f}" if spend > 0 else "-"
+        spend_remaining_formatted = f"${spend_remaining:,.2f}" if spend_remaining > 0 else "-"
+        cpl_formatted = f"${cpl:,.2f}" if cpl else "-"
+        cpp_formatted = f"${cpp:,.2f}" if cpp else "-"
+        cost_per_conv_formatted = f"${cost_per_conv:,.2f}" if cost_per_conv else "-"
+
+        rows.append([
+            name, daily_budget_formatted, spend_formatted, spend_remaining_formatted, 
+            leads, purchases, cpl_formatted, cpp_formatted, cost_per_conv_formatted
+        ])
+
+# Add consolidated CLUB4 entry
+if club4_data["account_count"] > 0:
+    club4_spend_remaining = round(club4_data["daily_budget"] * days_left, 2)
+    club4_cpl = round(club4_data["spend"] / club4_data["leads"], 2) if club4_data["leads"] else ""
+    club4_cpp = round(club4_data["spend"] / club4_data["purchases"], 2) if club4_data["purchases"] else ""
+    club4_cost_per_conv = round(club4_data["spend"] / (club4_data["leads"] + club4_data["purchases"]), 2) if (club4_data["leads"] + club4_data["purchases"]) else ""
+
+    # Format CLUB4 values
+    club4_daily_budget_formatted = f"${club4_data['daily_budget']:,.2f}" if club4_data["daily_budget"] > 0 else "-"
+    club4_spend_formatted = f"${club4_data['spend']:,.2f}" if club4_data["spend"] > 0 else "-"
+    club4_spend_remaining_formatted = f"${club4_spend_remaining:,.2f}" if club4_spend_remaining > 0 else "-"
+    club4_cpl_formatted = f"${club4_cpl:,.2f}" if club4_cpl else "-"
+    club4_cpp_formatted = f"${club4_cpp:,.2f}" if club4_cpp else "-"
+    club4_cost_per_conv_formatted = f"${club4_cost_per_conv:,.2f}" if club4_cost_per_conv else "-"
+
+    rows.insert(0, [
+        f"CLUB4 (All {club4_data['account_count']} Locations)", 
+        club4_daily_budget_formatted, 
+        club4_spend_formatted, 
+        club4_spend_remaining_formatted, 
+        club4_data["leads"], 
+        club4_data["purchases"], 
+        club4_cpl_formatted, 
+        club4_cpp_formatted, 
+        club4_cost_per_conv_formatted
     ])
 
 # Build markdown table
@@ -183,17 +261,29 @@ for row in rows:
     table_md += "| " + " | ".join(str(x) for x in row) + " |\n"
 
 # Create summary section
+current_date = datetime.date.today()
+month_start = datetime.date(current_date.year, current_date.month, 1)
 summary = f"""
-**📊 Summary for {datetime.date.today().strftime('%B %Y')}**
+**📊 Month-to-Date Summary ({current_date.strftime('%B %d, %Y')})**
+*Data from {month_start.strftime('%B %d')} - {current_date.strftime('%B %d, %Y')}*
+
 • Total Spend: ${totals["spend"]:,.2f}
 • Total Leads: {totals["leads"]:,}
 • Total Purchases: {totals["purchases"]:,}
 • Days Remaining: {days_left}
-• Accounts Processed: {len(accounts)}
+• Accounts Processed: {len(rows)}
+• Accounts Skipped: {len(skipped_accounts)}
 """
 
+# Add error summary if there are skipped accounts
+error_summary = ""
+if skipped_accounts:
+    error_summary = "\n**⚠️ Skipped Accounts:**\n"
+    for skip in skipped_accounts:
+        error_summary += f"• {skip['name']}: {skip['reason']}\n"
+
 message = {
-    "text": f"*🎯 Paid Media Account Summary*\n{summary}\n\n{table_md}"
+    "text": f"*🎯 Paid Media Account Summary*\n{summary}\n\n{table_md}{error_summary}"
 }
 
 if not DRY_RUN:
